@@ -104,11 +104,13 @@ func (s *Stream) ReadSCTP(p []byte) (int, PayloadProtocolIdentifier, error) {
 		if err == nil {
 			return n, ppi, nil
 		} else if errors.Is(err, io.ErrShortBuffer) {
+			fmt.Println("sctp: io.ErrorSortBuffer")
 			return 0, PayloadProtocolIdentifier(0), err
 		}
 
 		err = s.readErr
 		if err != nil {
+			fmt.Println("sctp: ", err.Error())
 			return 0, PayloadProtocolIdentifier(0), err
 		}
 
@@ -187,6 +189,7 @@ func (s *Stream) Write(p []byte) (n int, err error) {
 func (s *Stream) WriteSCTP(p []byte, ppi PayloadProtocolIdentifier) (n int, err error) {
 	maxMessageSize := s.association.MaxMessageSize()
 	if len(p) > int(maxMessageSize) {
+		fmt.Printf("sctp: %w: %v \n", errOutboundPacketTooLarge, math.MaxUint16)
 		return 0, fmt.Errorf("%w: %v", errOutboundPacketTooLarge, math.MaxUint16)
 	}
 
@@ -204,6 +207,7 @@ func (s *Stream) WriteSCTP(p []byte, ppi PayloadProtocolIdentifier) (n int, err 
 	err = s.writeErr
 	s.lock.RUnlock()
 	if err != nil {
+		fmt.Println("sctp: ", err.Error())
 		return 0, err
 	}
 
@@ -349,6 +353,8 @@ func (s *Stream) onBufferReleased(nBytesReleased int) {
 
 	if s.bufferedAmount < uint64(nBytesReleased) {
 		s.bufferedAmount = 0
+		fmt.Printf("sctp: [%s] released buffer size %d should be <= %d \n",
+		s.name, nBytesReleased, s.bufferedAmount)
 		s.log.Errorf("[%s] released buffer size %d should be <= %d",
 			s.name, nBytesReleased, s.bufferedAmount)
 	} else {
