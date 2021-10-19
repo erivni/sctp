@@ -68,6 +68,7 @@ var (
 
 func (p *packet) unmarshal(raw []byte) error {
 	if len(raw) < packetHeaderSize {
+		fmt.Printf("sctp packet: %w: raw only %d bytes, %d is the minimum length\n", errPacketRawTooSmall, len(raw), packetHeaderSize)
 		return fmt.Errorf("%w: raw only %d bytes, %d is the minimum length", errPacketRawTooSmall, len(raw), packetHeaderSize)
 	}
 
@@ -81,6 +82,7 @@ func (p *packet) unmarshal(raw []byte) error {
 		if offset == len(raw) {
 			break
 		} else if offset+chunkHeaderSize > len(raw) {
+			fmt.Printf("sctp packet:%w: offset %d remaining %d\n", errParseSCTPChunkNotEnoughData, offset, len(raw))
 			return fmt.Errorf("%w: offset %d remaining %d", errParseSCTPChunkNotEnoughData, offset, len(raw))
 		}
 
@@ -115,6 +117,7 @@ func (p *packet) unmarshal(raw []byte) error {
 		case ctShutdownComplete:
 			c = &chunkShutdownComplete{}
 		default:
+			fmt.Printf("sctp packet: %w: %s\n", errUnmarshalUnknownChunkType, chunkType(raw[offset]).String())
 			return fmt.Errorf("%w: %s", errUnmarshalUnknownChunkType, chunkType(raw[offset]).String())
 		}
 
@@ -129,8 +132,11 @@ func (p *packet) unmarshal(raw []byte) error {
 	theirChecksum := binary.LittleEndian.Uint32(raw[8:])
 	ourChecksum := generatePacketChecksum(raw)
 	if theirChecksum != ourChecksum {
+		fmt.Printf("sctp packet: %w: %d ours: %d\n", errChecksumMismatch, theirChecksum, ourChecksum)
 		return fmt.Errorf("%w: %d ours: %d", errChecksumMismatch, theirChecksum, ourChecksum)
 	}
+
+	fmt.Printf("sctp packet: unmarshal successfully!\n")
 	return nil
 }
 
