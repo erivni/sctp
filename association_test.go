@@ -1,3 +1,4 @@
+//go:build !js
 // +build !js
 
 package sctp
@@ -11,6 +12,7 @@ import (
 	"math"
 	"math/rand"
 	"net"
+	"os"
 	"runtime"
 	"strings"
 	"sync"
@@ -461,6 +463,57 @@ func TestAssocReliable(t *testing.T) {
 
 		assert.False(t, s0.reassemblyQueue.isReadable(), "should no longer be readable")
 		assert.Equal(t, 0, a0.bufferedAmount(), "incorrect bufferedAmount")
+
+		closeAssociationPair(br, a0, a1)
+	})
+
+	t.Run("ReadDeadline", func(t *testing.T) {
+		lim := test.TimeOut(time.Second * 10)
+		defer lim.Stop()
+
+		const si uint16 = 1
+		const msg = "ABC"
+		br := test.NewBridge()
+
+		a0, a1, err := createNewAssociationPair(br, ackModeNoDelay, 0)
+		if !assert.Nil(t, err, "failed to create associations") {
+			assert.FailNow(t, "failed due to earlier error")
+		}
+
+		s0, s1, err := establishSessionPair(br, a0, a1, si)
+		assert.Nil(t, err, "failed to establish session pair")
+
+		assert.Equal(t, 0, a0.bufferedAmount(), "incorrect bufferedAmount")
+
+		assert.NoError(t, s1.SetReadDeadline(time.Now().Add(time.Millisecond)), "failed to set read deadline")
+		buf := make([]byte, 32)
+		// First fails
+		n, ppi, err := s1.ReadSCTP(buf)
+		assert.Equal(t, 0, n)
+		assert.Equal(t, PayloadProtocolIdentifier(0), ppi)
+		assert.True(t, errors.Is(err, os.ErrDeadlineExceeded))
+		// Second too
+		n, ppi, err = s1.ReadSCTP(buf)
+		assert.Equal(t, 0, n)
+		assert.Equal(t, PayloadProtocolIdentifier(0), ppi)
+		assert.True(t, errors.Is(err, os.ErrDeadlineExceeded))
+		assert.NoError(t, s1.SetReadDeadline(time.Time{}), "failed to disable read deadline")
+
+		n, err = s0.WriteSCTP([]byte(msg), PayloadTypeWebRTCBinary)
+		if err != nil {
+			assert.FailNow(t, "failed due to earlier error")
+		}
+		assert.Equal(t, len(msg), n, "unexpected length of received data")
+		assert.Equal(t, len(msg), a0.bufferedAmount(), "incorrect bufferedAmount")
+
+		flushBuffers(br, a0, a1)
+
+		n, ppi, err = s1.ReadSCTP(buf)
+		if !assert.Nil(t, err, "ReadSCTP failed") {
+			assert.FailNow(t, "failed due to earlier error")
+		}
+		assert.Equal(t, n, len(msg), "unexpected length of received data")
+		assert.Equal(t, ppi, PayloadTypeWebRTCBinary, "unexpected ppi")
 
 		closeAssociationPair(br, a0, a1)
 	})
@@ -2651,11 +2704,12 @@ func TestAssociation_ShutdownDuringWrite(t *testing.T) {
 	}
 }
 
-func TestAssociation_HandlePacketBeforeInit(t *testing.T) {
+func TestAssociation_HandlePacketInCookieWaitState(t *testing.T) {
 	loggerFactory := logging.NewDefaultLoggerFactory()
 
 	testCases := map[string]struct {
 		inputPacket *packet
+		skipClose   bool
 	}{
 		"InitAck": {
 			inputPacket: &packet{
@@ -2679,6 +2733,8 @@ func TestAssociation_HandlePacketBeforeInit(t *testing.T) {
 				destinationPort: 1,
 				chunks:          []chunk{&chunkAbort{}},
 			},
+			// Prevent "use of close network connection" error on close.
+			skipClose: true,
 		},
 		"CoockeEcho": {
 			inputPacket: &packet{
@@ -2773,9 +2829,12 @@ func TestAssociation_HandlePacketBeforeInit(t *testing.T) {
 				LoggerFactory:        loggerFactory,
 			})
 			a.init(true)
-			defer func() {
-				assert.NoError(t, a.close())
-			}()
+
+			if !testCase.skipClose {
+				defer func() {
+					assert.NoError(t, a.close())
+				}()
+			}
 
 			packet, err := testCase.inputPacket.marshal()
 			assert.NoError(t, err)
@@ -2786,4 +2845,47 @@ func TestAssociation_HandlePacketBeforeInit(t *testing.T) {
 			time.Sleep(100 * time.Millisecond)
 		})
 	}
+}
+
+func TestAssociation_Abort(t *testing.T) {
+	runtime.GC()
+	n0 := runtime.NumGoroutine()
+
+	defer func() {
+		runtime.GC()
+		assert.Equal(t, n0, runtime.NumGoroutine(), "goroutine is leaked")
+	}()
+
+	a1, a2 := createAssocs(t)
+
+	s11, err := a1.OpenStream(1, PayloadTypeWebRTCString)
+	require.NoError(t, err)
+
+	s21, err := a2.OpenStream(1, PayloadTypeWebRTCString)
+	require.NoError(t, err)
+
+	testData := []byte("test")
+
+	i, err := s11.Write(testData)
+	assert.Equal(t, len(testData), i)
+	assert.NoError(t, err)
+
+	buf := make([]byte, len(testData))
+	i, err = s21.Read(buf)
+	assert.Equal(t, len(testData), i)
+	assert.NoError(t, err)
+	assert.Equal(t, testData, buf)
+
+	a1.Abort("1234")
+
+	// Wait for close read loop channels to prevent flaky tests.
+	select {
+	case <-a2.readLoopCloseCh:
+	case <-time.After(1 * time.Second):
+		assert.Fail(t, "timed out waiting for a2 read loop to close")
+	}
+
+	i, err = s21.Read(buf)
+	assert.Equal(t, i, 0, "expected no data read")
+	assert.Error(t, err, "User Initiated Abort: 1234", "expected abort reason")
 }

@@ -102,9 +102,9 @@ func TestInitMarshalUnmarshal(t *testing.T) {
 	initAck.numInboundStreams = 1
 	initAck.initiateTag = 123
 	initAck.advertisedReceiverWindowCredit = 1024
-	cookie, errRand := newRandomStateCookie()
-	if errRand != nil {
-		t.Fatalf("Failed to generate random state cookie: %v", errRand)
+	cookie, ErrRand := newRandomStateCookie()
+	if ErrRand != nil {
+		t.Fatalf("Failed to generate random state cookie: %v", ErrRand)
 	}
 	initAck.params = []param{cookie}
 
@@ -182,8 +182,8 @@ func TestReconfigChunk(t *testing.T) {
 		t.Error("Failed to cast Chunk -> Reconfig")
 	}
 
-	if c.paramA.(*paramOutgoingResetRequest).streamIdentifiers[0] != uint16(1) {
-		t.Errorf("unexpected stream identifier: %d", c.paramA.(*paramOutgoingResetRequest).streamIdentifiers[0])
+	if c.paramA.(*paramOutgoingResetRequest).streamIdentifiers[0] != uint16(1) { //nolint:forcetypeassert
+		t.Errorf("unexpected stream identifier: %d", c.paramA.(*paramOutgoingResetRequest).streamIdentifiers[0]) //nolint:forcetypeassert
 	}
 }
 

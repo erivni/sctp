@@ -10,7 +10,8 @@ type param interface {
 	length() int
 }
 
-var errParamTypeUnhandled = errors.New("unhandled ParamType")
+// ErrParamTypeUnhandled is returned if unknown parameter type is specified.
+var ErrParamTypeUnhandled = errors.New("unhandled ParamType")
 
 func buildParam(t paramType, rawParam []byte) (param, error) {
 	switch t {
@@ -18,6 +19,8 @@ func buildParam(t paramType, rawParam []byte) (param, error) {
 		return (&paramForwardTSNSupported{}).unmarshal(rawParam)
 	case supportedExt:
 		return (&paramSupportedExtensions{}).unmarshal(rawParam)
+	case ecnCapable:
+		return (&paramECNCapable{}).unmarshal(rawParam)
 	case random:
 		return (&paramRandom{}).unmarshal(rawParam)
 	case reqHMACAlgo:
@@ -33,6 +36,6 @@ func buildParam(t paramType, rawParam []byte) (param, error) {
 	case reconfigResp:
 		return (&paramReconfigResponse{}).unmarshal(rawParam)
 	default:
-		return nil, fmt.Errorf("%w: %v", errParamTypeUnhandled, t)
+		return nil, fmt.Errorf("%w: %v", ErrParamTypeUnhandled, t)
 	}
 }
