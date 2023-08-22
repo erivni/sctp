@@ -11,6 +11,8 @@ import (
 	"io"
 	"math"
 	"net"
+	"os"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -284,6 +286,8 @@ func createAssociation(config Config) *Association {
 	}
 
 	tsn := globalMathRandomGenerator.Uint32()
+	mtu := getInitialMtu()
+
 	a := &Association{
 		netConn:                 config.NetConn,
 		maxReceiveBufferSize:    maxReceiveBufferSize,
@@ -294,8 +298,8 @@ func createAssociation(config Config) *Association {
 		inflightQueue:           newPayloadQueue(),
 		pendingQueue:            newPendingQueue(),
 		controlQueue:            newControlQueue(),
-		mtu:                     initialMTU,
-		maxPayloadSize:          initialMTU - (commonHeaderSize + dataChunkHeaderSize),
+		mtu:                     mtu,
+		maxPayloadSize:          mtu - (commonHeaderSize + dataChunkHeaderSize),
 		myVerificationTag:       globalMathRandomGenerator.Uint32(),
 		myNextTSN:               tsn,
 		myNextRSN:               tsn,
@@ -2581,4 +2585,15 @@ func (a *Association) MaxMessageSize() uint32 {
 // SetMaxMessageSize sets the maximum message size you can send.
 func (a *Association) SetMaxMessageSize(maxMsgSize uint32) {
 	atomic.StoreUint32(&a.maxMessageSize, maxMsgSize)
+}
+
+func getInitialMtu() uint32 {
+	initialMtuEnv := os.Getenv("HYPERSCALE_WEBRTC_SCTP_MTU")
+	if initialMtuEnv != "" {
+		parsed, err := strconv.ParseUint(initialMtuEnv, 10, 32)
+		if err == nil {
+			return uint32(parsed)
+		}
+	}
+	return initialMTU
 }
