@@ -760,7 +760,7 @@ func (a *Association) gatherOutboundFastRetransmissionPackets(rawPackets [][]byt
 			c.nSent++
 			a.checkPartialReliabilityStatus(c)
 			toFastRetrans = append(toFastRetrans, c)
-			a.log.Tracef("[%s] fast-retransmit: tsn=%d sent=%d htna=%d",
+			a.log.Infof("[%s] fast-retransmit: tsn=%d sent=%d htna=%d",
 				a.name, c.tsn, c.nSent, a.fastRecoverExitPoint)
 		}
 
@@ -1313,7 +1313,7 @@ func (a *Association) handleData(d *chunkPayloadData) []*packet {
 				a.payloadQueue.push(d, a.peerLastTSN)
 				s.handleData(d)
 			} else {
-				a.log.Debugf("[%s] receive buffer full. dropping DATA with tsn=%d ssn=%d", a.name, d.tsn, d.streamSequenceNumber)
+				a.log.Warnf("[%s] receive buffer full. dropping DATA with tsn=%d ssn=%d", a.name, d.tsn, d.streamSequenceNumber)
 			}
 		}
 	}
@@ -1350,7 +1350,7 @@ func (a *Association) handlePeerLastTSNAndAcknowledgement(sackImmediately bool) 
 
 	hasPacketLoss := (a.payloadQueue.size() > 0)
 	if hasPacketLoss {
-		a.log.Tracef("[%s] packetloss: %s", a.name, a.payloadQueue.getGapAckBlocksString(a.peerLastTSN))
+		a.log.Warnf("[%s] packetloss: %s", a.name, a.payloadQueue.getGapAckBlocksString(a.peerLastTSN))
 	}
 
 	if (a.ackState != ackStateImmediate && !sackImmediately && !hasPacketLoss && a.ackMode == ackModeNormal) || a.ackMode == ackModeAlwaysDelay {
@@ -2233,13 +2233,13 @@ func (a *Association) checkPartialReliabilityStatus(c *chunkPayloadData) {
 		if s.reliabilityType == ReliabilityTypeRexmit {
 			if c.nSent >= s.reliabilityValue {
 				c.setAbandoned(true)
-				a.log.Tracef("[%s] marked as abandoned: tsn=%d ppi=%d (remix: %d)", a.name, c.tsn, c.payloadType, c.nSent)
+				a.log.Errorf("[%s] marked as abandoned: tsn=%d ppi=%d (remix: %d)", a.name, c.tsn, c.payloadType, c.nSent)
 			}
 		} else if s.reliabilityType == ReliabilityTypeTimed {
 			elapsed := int64(time.Since(c.since).Seconds() * 1000)
 			if elapsed >= int64(s.reliabilityValue) {
 				c.setAbandoned(true)
-				a.log.Tracef("[%s] marked as abandoned: tsn=%d ppi=%d (timed: %d)", a.name, c.tsn, c.payloadType, elapsed)
+				a.log.Errorf("[%s] marked as abandoned: tsn=%d ppi=%d (timed: %d)", a.name, c.tsn, c.payloadType, elapsed)
 			}
 		}
 		s.lock.RUnlock()
@@ -2283,7 +2283,7 @@ func (a *Association) getDataPacketsToRetransmit() []*packet {
 
 		a.checkPartialReliabilityStatus(c)
 
-		a.log.Tracef("[%s] retransmitting tsn=%d ssn=%d sent=%d", a.name, c.tsn, c.streamSequenceNumber, c.nSent)
+		a.log.Infof("[%s] retransmitting tsn=%d ssn=%d sent=%d", a.name, c.tsn, c.streamSequenceNumber, c.nSent)
 
 		chunks = append(chunks, c)
 	}
