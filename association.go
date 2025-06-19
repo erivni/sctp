@@ -23,6 +23,7 @@ import (
 
 // Use global random generator to properly seed by crypto grade random.
 var globalMathRandomGenerator = randutil.NewMathRandomGenerator() // nolint:gochecknoglobals
+const defaultSCTPSrcDstPort = 40000
 
 // Association errors
 var (
@@ -378,8 +379,15 @@ func (a *Association) sendInit() error {
 
 	outbound := &packet{}
 	outbound.verificationTag = a.peerVerificationTag
-	a.sourcePort = 5000      // Spec??
-	a.destinationPort = 5000 // Spec??
+
+	portStr := os.Getenv("SENZA_SCTP_PORT")
+	sctpPort, err := strconv.ParseUint(portStr, 10, 16)
+	if err != nil {
+		sctpPort = defaultSCTPSrcDstPort
+	}
+
+	a.sourcePort = uint16(sctpPort)      // Spec??
+	a.destinationPort = uint16(sctpPort) // Spec??
 	outbound.sourcePort = a.sourcePort
 	outbound.destinationPort = a.destinationPort
 
