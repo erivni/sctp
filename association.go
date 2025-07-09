@@ -332,6 +332,8 @@ func createAssociation(config Config) *Association {
 		sourcePort:              port,
 	}
 
+	a.log.Infof("port value from config %d and ports dest: %d src: %d", config.Port, a.destinationPort, a.sourcePort)
+
 	a.name = fmt.Sprintf("%p", a)
 
 	// RFC 4690 Sec 7.2.1
