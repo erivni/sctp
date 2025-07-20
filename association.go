@@ -55,6 +55,7 @@ const (
 	commonHeaderSize      uint32 = 12
 	dataChunkHeaderSize   uint32 = 16
 	defaultMaxMessageSize uint32 = 65536
+	defaultPort           uint16 = 5000
 )
 
 // association state enums
@@ -235,6 +236,7 @@ type Config struct {
 	NetConn              net.Conn
 	MaxReceiveBufferSize uint32
 	MaxMessageSize       uint32
+	Port                 uint16
 	LoggerFactory        logging.LoggerFactory
 }
 
@@ -285,6 +287,13 @@ func createAssociation(config Config) *Association {
 		maxMessageSize = config.MaxMessageSize
 	}
 
+	var port uint16
+	if config.Port == 0 {
+		port = defaultPort
+	} else {
+		port = config.Port
+	}
+
 	tsn := globalMathRandomGenerator.Uint32()
 	mtu := getInitialMtu()
 
@@ -319,6 +328,8 @@ func createAssociation(config Config) *Association {
 		silentError:             ErrSilentlyDiscard,
 		stats:                   &associationStats{},
 		log:                     config.LoggerFactory.NewLogger("sctp"),
+		destinationPort:         port,
+		sourcePort:              port,
 	}
 
 	a.name = fmt.Sprintf("%p", a)
@@ -378,8 +389,8 @@ func (a *Association) sendInit() error {
 
 	outbound := &packet{}
 	outbound.verificationTag = a.peerVerificationTag
-	a.sourcePort = 5000      // Spec??
-	a.destinationPort = 5000 // Spec??
+	// a.sourcePort = 5000      // Spec??
+	// a.destinationPort = 5000 // Spec??
 	outbound.sourcePort = a.sourcePort
 	outbound.destinationPort = a.destinationPort
 
