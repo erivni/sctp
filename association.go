@@ -332,8 +332,6 @@ func createAssociation(config Config) *Association {
 		sourcePort:              port,
 	}
 
-	a.log.Infof("port value from config %d and ports dest: %d src: %d", config.Port, a.destinationPort, a.sourcePort)
-
 	a.name = fmt.Sprintf("%p", a)
 
 	// RFC 4690 Sec 7.2.1
@@ -393,7 +391,6 @@ func (a *Association) sendInit() error {
 	outbound.verificationTag = a.peerVerificationTag
 	// a.sourcePort = 5000      // Spec??
 	// a.destinationPort = 5000 // Spec??
-	a.log.Infof("[sendInit] ports dest:%d src:%d", a.sourcePort, a.destinationPort)
 	outbound.sourcePort = a.sourcePort
 	outbound.destinationPort = a.destinationPort
 
@@ -1095,7 +1092,6 @@ func (a *Association) handleInit(p *packet, i *chunkInit) ([]*packet, error) {
 	a.peerVerificationTag = i.initiateTag
 	a.sourcePort = p.destinationPort
 	a.destinationPort = p.sourcePort
-	a.log.Infof("[handleInit] updated src port to %d and dest port to %d", a.sourcePort, a.destinationPort)
 
 	// 13.2 This is the last TSN received in sequence.  This value
 	// is set initially by taking the peer's initial TSN,
