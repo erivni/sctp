@@ -533,7 +533,7 @@ func (a *Association) readLoop() {
 	}()
 
 	a.log.Debugf("[%s] readLoop entered", a.name)
-	buffer := make([]byte, receiveMTU)
+	buffer := make([]byte, getReceivedMtu())
 
 	for {
 		n, err := a.netConn.Read(buffer)
@@ -2596,4 +2596,14 @@ func getInitialMtu() uint32 {
 		}
 	}
 	return initialMTU
+}
+func getReceivedMtu() uint32 {
+	receivedMtuEnv := os.Getenv("HYPERSCALE_WEBRTC_SCTP_MTU")
+	if receivedMtuEnv != "" {
+		parsed, err := strconv.ParseUint(receivedMtuEnv, 10, 32)
+		if err == nil {
+			return uint32(parsed)
+		}
+	}
+	return receiveMTU
 }
